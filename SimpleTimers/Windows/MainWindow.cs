@@ -39,19 +39,20 @@ public class MainWindow : Window, IDisposable
 
         using (var table = ImRaii.Table("Timers", 7))
         {
-            ImGui.TableSetupColumn("Name");
+            ImGui.TableSetupColumn("Nombre");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Time Remaining");
+            ImGui.TableSetupColumn("Tiempo Restante");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Interval");
+            ImGui.TableSetupColumn("Intervalo");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Last");
+            ImGui.TableSetupColumn("Ultimo");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Reminder");
+            ImGui.TableSetupColumn("Recordatorio");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Restart");
+            ImGui.TableSetupColumn("Eliminar");
             ImGui.TableNextColumn();
-            ImGui.TableSetupColumn("Remove");
+            ImGui.TableSetupColumn("Habilitado");
+
             ImGui.TableHeadersRow();
 
 
@@ -61,6 +62,7 @@ public class MainWindow : Window, IDisposable
 
             foreach (var timer in plugin.Configuration.timers)
             {
+                ImGui.PushID(timer.Key);
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.Text(timer.Key);
@@ -73,25 +75,33 @@ public class MainWindow : Window, IDisposable
                 ImGui.Text(timer.Value.GetInterval());
 
                 ImGui.TableNextColumn();
-                ImGui.Text(timer.Value.last.ToString());
+                if (timer.Value.last > now)
+                {
+                    ImGui.Text("N/A");
+                }
+                else
+                {
+                    ImGui.Text(timer.Value.last.ToString());
+                }
+
 
                 ImGui.TableNextColumn();
                 ImGui.Text(timer.Value.remind_time.Humanize());
 
                 ImGui.TableNextColumn();
-                if (ImGui.Button("Restart"))
+                if (ImGui.Button("Eliminar"))
                 {
-                    timer.Value.start = DateTime.Now;
-                    timer.Value.last = timer.Value.start;
-                    timer.Value.reminder_fired = false;
-                    plugin.Configuration.Save();
-                }
-
-                ImGui.TableNextColumn();
-                if (ImGui.Button("Remove"))
-                {
+                    Plugin.Log.Debug($"Removing {timer.Key}");
                     toRemove.Add(timer.Key);
                 }
+                ImGui.TableNextColumn();
+                var enabled = timer.Value.enabled;
+                if (ImGui.Checkbox("Activado", ref enabled))
+                {
+                    timer.Value.enabled = enabled;
+                }
+
+                ImGui.PopID();
             }
 
             foreach (var rem in toRemove)

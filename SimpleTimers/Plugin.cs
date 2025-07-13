@@ -8,6 +8,7 @@ using SimpleTimers.Windows;
 using Dalamud.Game.ClientState.Objects;
 using System;
 using Humanizer;
+using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace SimpleTimers;
 
@@ -86,20 +87,33 @@ public sealed class Plugin : IDalamudPlugin
 
         foreach (var timer in Configuration.timers)
         {
+            if (!timer.Value.enabled)
+                continue;
+
             var timerValue = timer.Value;
             var next = timerValue.Next();
 
             if (!timerValue.reminder_fired && (next - timerValue.remind_time) <= now)
             {
-                Chat.Print($"Timer {timer.Key} reminder, remaining {timerValue.remind_time.Humanize()}", "SimpleTimers", 0x0f);
+                Chat.Print($"Recordatorio de alarma: {timer.Key}, faltan {timerValue.remind_time.Humanize()}", "SimpleTimers", 0x0f);
                 timerValue.reminder_fired = true;
+
+                if (timerValue.play_sound_reminder)
+                {
+                    UIGlobals.PlaySoundEffect(0x26);
+                }
             }
 
             if (next <= now)
             {
-                Chat.Print($"Timer {timer.Key} fired!", "SimpleTimers", 0x0f);
+                Chat.Print($"Alarma: {timer.Key}", "SimpleTimers", 0x0f);
                 timerValue.reminder_fired = false;
                 timerValue.last = now;
+
+                if (timerValue.play_sound)
+                {
+                    UIGlobals.PlaySoundEffect(0x26);
+                }
             }
         }
 

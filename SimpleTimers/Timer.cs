@@ -20,9 +20,17 @@ public class Timer
     public DateTime start { get; set; }
     public DateTime last { get; set; }
 
+    public bool enabled { get; set; } = true;
+
+    public bool play_sound = true;
+    public bool play_sound_reminder = true;
+
 
     public DateTime Next()
     {
+        if (last >= DateTime.Now)
+            return last;
+
         var next = last;
         next = next.AddSeconds(seconds);
         next = next.AddMinutes(minutes);
@@ -41,26 +49,26 @@ public class Timer
 
     public string GetInterval()
     {
-        var i = "Every";
+        var i = "Cada";
 
         if (days > 0)
         {
-            i += $" {days} days";
+            i += $" {days} dias";
         }
 
         if (hours > 0)
         {
-            i += $" {hours} hours";
+            i += $" {hours} horas";
         }
 
         if (minutes > 0)
         {
-            i += $" {minutes} minutes";
+            i += $" {minutes} minutos";
         }
 
         if (seconds > 0)
         {
-            i += $" {seconds} seconds";
+            i += $" {seconds} segundos";
         }
 
         return i;

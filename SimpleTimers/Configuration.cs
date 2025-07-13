@@ -12,7 +12,7 @@ public class Configuration : IPluginConfiguration
 
     public bool IsConfigWindowMovable { get; set; } = true;
 
-    public OrderedDictionary<string, Timer> timers { get; set; } = [];
+    public SortedDictionary<string, Timer> timers { get; set; } = [];
 
     public DateTime last_save { get; set; } = DateTime.Now;
 

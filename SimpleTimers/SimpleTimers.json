@@ -1,0 +1,12 @@
+{
+  "Author": "Zhyra",
+  "Name": "SimpleTimers",
+  "Punchline": "Create customizable timers for all your needs.",
+  "Description": "Create customizable timers for all your needs. /stimers",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "timers",
+    "scheduling",
+    "tasks"
+  ]
+}

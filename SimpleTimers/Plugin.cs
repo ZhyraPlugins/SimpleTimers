@@ -4,9 +4,12 @@ using Dalamud.Plugin;
 using System.IO;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using SamplePlugin.Windows;
+using SimpleTimers.Windows;
+using Dalamud.Game.ClientState.Objects;
+using System;
+using Humanizer;
 
-namespace SamplePlugin;
+namespace SimpleTimers;
 
 public sealed class Plugin : IDalamudPlugin
 {
@@ -16,14 +19,19 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] public static IFramework Framework { get; private set; } = null!;
+    [PluginService] public static IChatGui Chat { get; private set; } = null!;
 
-    private const string CommandName = "/pmycommand";
+    private const string CommandName = "/stimers";
 
     public Configuration Configuration { get; init; }
 
-    public readonly WindowSystem WindowSystem = new("SamplePlugin");
+    public readonly WindowSystem WindowSystem = new("SimpleTimers");
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
+    private AddTimerWindow AddTimerWindow { get; init; }
+
+    private DateTime LastUpdate { get; set; }
 
     public Plugin()
     {
@@ -34,13 +42,15 @@ public sealed class Plugin : IDalamudPlugin
 
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this, goatImagePath);
+        AddTimerWindow = new AddTimerWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
+        WindowSystem.AddWindow(AddTimerWindow);
         WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "A useful message to display in /xlhelp"
+            HelpMessage = "Manage your own customizable timers"
         });
 
         PluginInterface.UiBuilder.Draw += DrawUI;
@@ -52,18 +62,63 @@ public sealed class Plugin : IDalamudPlugin
         // Adds another button that is doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
 
+        LastUpdate = DateTime.Now;
+        Framework.Update += OnFrameworkUpdate;
+
         // Add a simple message to the log with level set to information
         // Use /xllog to open the log window in-game
         // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
     }
 
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        if (!ClientState.IsLoggedIn) return;
+
+        var now = DateTime.Now;
+        var elapsed = now - LastUpdate;
+
+        if (elapsed.TotalMilliseconds < 500)
+            return;
+
+
+        LastUpdate = now;
+
+        foreach (var timer in Configuration.timers)
+        {
+            var timerValue = timer.Value;
+            var next = timerValue.Next();
+
+            if (!timerValue.reminder_fired && (next - timerValue.remind_time) <= now)
+            {
+                Chat.Print($"Timer {timer.Key} reminder, remaining {timerValue.remind_time.Humanize()}", "SimpleTimers", 0x0f);
+                timerValue.reminder_fired = true;
+            }
+
+            if (next <= now)
+            {
+                Chat.Print($"Timer {timer.Key} fired!", "SimpleTimers", 0x0f);
+                timerValue.reminder_fired = false;
+                timerValue.last = now;
+            }
+        }
+
+        if ((now - Configuration.last_save).TotalSeconds > 60)
+        {
+            Configuration.last_save = now;
+            Configuration.Save();
+        }
+    }
+
     public void Dispose()
     {
+        Framework.Update -= OnFrameworkUpdate;
+
         WindowSystem.RemoveAllWindows();
 
         ConfigWindow.Dispose();
         MainWindow.Dispose();
+        AddTimerWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
     }
@@ -78,4 +133,5 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ToggleConfigUI() => ConfigWindow.Toggle();
     public void ToggleMainUI() => MainWindow.Toggle();
+    public void ToggleAddTimerWindow() => AddTimerWindow.Toggle();
 }

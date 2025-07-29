@@ -38,11 +38,8 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        // you might normally want to embed resources and load them from the manifest stream
-        var goatImagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "goat.png");
-
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, goatImagePath);
+        MainWindow = new MainWindow(this);
         AddTimerWindow = new AddTimerWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
@@ -55,21 +52,26 @@ public sealed class Plugin : IDalamudPlugin
         });
 
         PluginInterface.UiBuilder.Draw += DrawUI;
-
-        // This adds a button to the plugin installer entry of this plugin which allows
-        // to toggle the display status of the configuration ui
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
-
-        // Adds another button that is doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
 
         LastUpdate = DateTime.Now;
-        Framework.Update += OnFrameworkUpdate;
 
-        // Add a simple message to the log with level set to information
-        // Use /xllog to open the log window in-game
-        // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
-        Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
+        // update offline timers
+        var now = DateTime.Now;
+
+
+        foreach (var timer in Configuration.timers)
+        {
+            var timerValue = timer.Value;
+
+            while (timerValue.last < now)
+                timerValue.last = timerValue.Next();
+        }
+
+        Configuration.Save();
+
+        Framework.Update += OnFrameworkUpdate;
     }
 
     private void OnFrameworkUpdate(IFramework framework)
@@ -79,7 +81,7 @@ public sealed class Plugin : IDalamudPlugin
         var now = DateTime.Now;
         var elapsed = now - LastUpdate;
 
-        if (elapsed.TotalMilliseconds < 500)
+        if (elapsed.TotalMilliseconds < 200)
             return;
 
 
@@ -87,13 +89,11 @@ public sealed class Plugin : IDalamudPlugin
 
         foreach (var timer in Configuration.timers)
         {
-            if (!timer.Value.enabled)
-                continue;
 
             var timerValue = timer.Value;
             var next = timerValue.Next();
 
-            if (!timerValue.reminder_fired && (next - timerValue.remind_time) <= now)
+            if (timer.Value.enabled && !timerValue.reminder_fired && (next - timerValue.remind_time) <= now)
             {
                 Chat.Print($"Recordatorio de alarma: {timer.Key}, faltan {timerValue.remind_time.Humanize()}", "SimpleTimers", 0x0f);
                 timerValue.reminder_fired = true;
@@ -106,13 +106,16 @@ public sealed class Plugin : IDalamudPlugin
 
             if (next <= now)
             {
-                Chat.Print($"Alarma: {timer.Key}", "SimpleTimers", 0x0f);
                 timerValue.reminder_fired = false;
-                timerValue.last = now;
+                timerValue.last = next;
 
-                if (timerValue.play_sound)
+                if (timerValue.enabled)
                 {
-                    UIGlobals.PlaySoundEffect(0x26);
+                    Chat.Print($"Alarma: {timer.Key}", "SimpleTimers", 0x0f);
+                    if (timerValue.play_sound)
+                    {
+                        UIGlobals.PlaySoundEffect(0x26);
+                    }
                 }
             }
         }
@@ -135,6 +138,8 @@ public sealed class Plugin : IDalamudPlugin
         AddTimerWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
+
+        Configuration.Save();
     }
 
     private void OnCommand(string command, string args)

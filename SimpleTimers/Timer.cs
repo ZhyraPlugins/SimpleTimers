@@ -12,8 +12,6 @@ public class Timer
     public int minutes { get; set; } = 0;
     public int hours { get; set; } = 0;
 
-    public int days { get; set; } = 0;
-
     public TimeSpan remind_time { get; set; }
 
     public bool reminder_fired { get; set; }
@@ -35,7 +33,6 @@ public class Timer
         next = next.AddSeconds(seconds);
         next = next.AddMinutes(minutes);
         next = next.AddHours(hours);
-        next = next.AddDays(days);
 
         return next;
     }
@@ -50,11 +47,6 @@ public class Timer
     public string GetInterval()
     {
         var i = "Cada";
-
-        if (days > 0)
-        {
-            i += $" {days} dias";
-        }
 
         if (hours > 0)
         {

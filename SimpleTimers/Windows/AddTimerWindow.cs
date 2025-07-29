@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using ImGuiNET;
@@ -15,8 +16,8 @@ public class AddTimerWindow : Window, IDisposable
 
     private readonly string[] reminder_time = ["Seconds", "Minutes"];
     private int reminder_idx = 1;
-    private bool snap_to_hour = false;
-    private int snap_hours = 1;
+
+    private int start_delay_hour = 0;
 
     // We give this window a hidden ID using ##
     // So that the user will see "My Amazing Window" as window title,
@@ -42,15 +43,16 @@ public class AddTimerWindow : Window, IDisposable
     public override void Draw()
     {
 
+        ImGui.PushItemWidth(200);
+        ImGui.InputText("Nombre del Timer", ref timerName, 128);
+
+        ImGui.Spacing();
+
         ImGui.Text("Intervalo del Timer");
-
-        var days = timer.days;
-        if (ImGui.InputInt("Dias", ref days))
-            timer.days = days;
-
+        ImGui.PushItemWidth(150);
         var hours = timer.hours;
-        if (ImGui.InputInt("Horas", ref hours))
-            timer.hours = Math.Min(hours, 23);
+        ImGui.InputInt("Horas", ref hours);
+        timer.hours = hours;
 
         var minutes = timer.minutes;
         if (ImGui.InputInt("Minutos", ref minutes))
@@ -60,18 +62,6 @@ public class AddTimerWindow : Window, IDisposable
         if (ImGui.InputInt("Segundos", ref seconds))
             timer.seconds = Math.Min(seconds, 59);
 
-
-        ImGui.Spacing();
-
-        var start_time = DateTime.Now;
-
-        ImGui.Checkbox("Empezar en la siguiente hora.", ref snap_to_hour);
-
-        if (snap_to_hour)
-        {
-            start_time = new DateTime(start_time.Year, start_time.Month, start_time.Day, start_time.Hour + snap_hours, 0, 0);
-            ImGui.InputInt($"Empezar la alarma cuando sean las {start_time.ToString()}", ref snap_hours);
-        }
 
         ImGui.Spacing();
 
@@ -87,6 +77,8 @@ public class AddTimerWindow : Window, IDisposable
             timer.play_sound_reminder = play_sound_reminder;
         }
 
+        ImGui.Spacing();
+
         if (reminder_idx == 0)
         {
             var seconds_reminder = (int)timer.remind_time.TotalSeconds;
@@ -101,17 +93,54 @@ public class AddTimerWindow : Window, IDisposable
         }
         ImGui.Spacing();
 
-        ImGui.ListBox("Unidad del recordatorio", ref reminder_idx, reminder_time, reminder_time.Length);
+        using (var x = ImRaii.ListBox("Unidad del recordatorio", new Vector2(150, 50)))
+        {
+            if (ImGui.Selectable("Segundos"))
+            {
+                reminder_idx = 0;
+            }
+            if (ImGui.Selectable("Minutos"))
+            {
+                reminder_idx = 1;
+            }
+        }
+
+        ImGui.InputInt("Atrasar la primera alarma en (horas):", ref start_delay_hour);
 
         ImGui.Spacing();
 
-        ImGui.InputText("Nombre del Timer", ref timerName, 128);
+        ImGui.PopItemWidth();
 
-        ImGui.Spacing();
+        var now = DateTime.Now;
+        var start_time = now;
+
+        if (hours != 0)
+        {
+            start_time = new DateTime(start_time.Year, start_time.Month, start_time.Day, 0, 0, 0);
+            start_time = start_time.AddHours(multipleOf(now.Hour + 1, hours));
+        }
+        else if (minutes != 0)
+        {
+            start_time = new DateTime(start_time.Year, start_time.Month, start_time.Day, start_time.Hour, 0, 0);
+            start_time = start_time.AddMinutes(multipleOf(now.Minute + 1, minutes));
+        }
+        else if (seconds != 0)
+        {
+            start_time = new DateTime(start_time.Year, start_time.Month, start_time.Day, start_time.Hour, start_time.Minute, 0);
+            start_time = start_time.AddSeconds(multipleOf(now.Second + 1, seconds));
+        }
+
+        if (start_delay_hour != 0)
+        {
+            start_time = start_time.AddHours(start_delay_hour);
+        }
+
+
+        ImGui.Text($"La alarma empezará a las {start_time}");
 
         if (ImGui.Button("Crear"))
         {
-            if (timer.seconds == 0 && timer.minutes == 0 && timer.hours == 0 && timer.days == 0)
+            if (timer.seconds == 0 && timer.minutes == 0 && timer.hours == 0)
                 return;
 
             if (timerName.IsNullOrWhitespace())
@@ -129,11 +158,16 @@ public class AddTimerWindow : Window, IDisposable
             timer = new();
             timer.remind_time = new TimeSpan(0, 1, 0);
             timer.reminder_fired = false;
-            snap_hours = 1;
-            snap_to_hour = false;
             reminder_idx = 1;
 
             Toggle();
         }
+    }
+
+    private int multipleOf(int value, int multiple)
+    {
+        if (value % multiple == 0)
+            return value;
+        return value + (multiple - (value % multiple));
     }
 }
